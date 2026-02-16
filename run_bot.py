@@ -7,7 +7,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
 def scrape_shopee():
-    print(" Mencoba menyambung ke Chrome (Port 9222)...")
+    print("🚀 Mencoba menyambung ke Chrome (Port 9222)...")
     
     options = Options()
     # Menyambung ke jendela Chrome yang sudah terbuka di port 9222
