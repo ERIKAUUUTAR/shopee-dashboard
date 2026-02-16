@@ -1,115 +1,158 @@
 import json
 import time
 import os
-import random
+import shutil
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+# ==================== KONFIGURASI ====================
+# Ganti USERNAME_WINDOWS dengan nama user laptop Anda
+# Contoh: C:\\Users\\Administrator\\AppData\\Local\\Google\\Chrome\\User Data
+user_data_dir = r"C:\Users\NAMA_USER_ANDA\AppData\Local\Google\Chrome\User Data" 
+# =====================================================
+
+def setup_driver():
+    options = Options()
+    # PENTING: Menggunakan Profile Default (yang sudah Login Shopee)
+    options.add_argument(f"user-data-dir={user_data_dir}")
+    options.add_argument("profile-directory=Default") 
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-infobars")
+    # Headless dimatikan agar session login terbaca & aman dari deteksi bot
+    driver = webdriver.Chrome(options=options)
+    return driver
+
+def get_max_discount(driver):
+    """Mengecek Voucher Wallet untuk melihat potensi diskon terbesar"""
+    print("🎫 Mengecek Dompet Voucher Anda...")
+    driver.get("https://shopee.co.id/user/voucher-wallet")
+    time.sleep(5)
+    
+    max_discount = 0
+    try:
+        # Mencari teks angka di dalam kartu voucher (Sangat bergantung struktur HTML Shopee)
+        # Kita pakai logika aman: Cari angka 'RB' atau '%' di elemen voucher
+        vouchers = driver.find_elements(By.CSS_SELECTOR, ".voucher-card-content")
+        
+        print(f"   Ditemukan {len(vouchers)} voucher aktif.")
+        
+        # LOGIKA SIMPEL: Jika ada voucher, anggap kita punya diskon minimal 10rb
+        # (Karena parsing teks voucher shopee sangat rumit & sering berubah)
+        if len(vouchers) > 0:
+            max_discount = 10000 # Asumsi aman diskon 10rb
+            # Jika ingin lebih agresif, ubah jadi 20000
+            
+    except Exception as e:
+        print("   Gagal baca detail voucher, menggunakan default.")
+    
+    print(f"   ✅ Potensi Potongan: Rp {max_discount}")
+    return max_discount
 
 def scrape_shopee():
-    print("🚀 Mencoba menyambung ke Chrome (Port 9222)...")
-    
-    options = Options()
-    # Menyambung ke jendela Chrome yang sudah terbuka di port 9222
-    options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
-    
+    # TUTUP CHROME SEBELUM MULAI
+    os.system("taskkill /im chrome.exe /f")
+    time.sleep(2)
+
+    driver = setup_driver()
+    results = []
+
     try:
-        driver = webdriver.Chrome(options=options)
-        results = []
-        
-        # Kata kunci pencarian
-        keywords = ["aksesoris hp murah", "flash sale 1000", "barang unik", "peralatan dapur"]
-        estimasi_voucher = 10000 
+        # 1. Cek Diskon dari Akun
+        discount_value = get_max_discount(driver)
+
+        # 2. Cari Barang
+        keywords = ["aksesoris hp", "peralatan dapur", "stationery lucu"]
+        print("🔍 Memulai Pencarian Barang...")
 
         for keyword in keywords:
-            print(f"\n🔍 Menelusuri: '{keyword}'...")
             url = f"https://shopee.co.id/search?keyword={keyword}&order=asc&sortBy=price"
+            driver.get(url)
+            time.sleep(4)
+            driver.execute_script("window.scrollTo(0, 1000);")
+            time.sleep(2)
+
+            items = driver.find_elements(By.CSS_SELECTOR, ".shopee-search-item-result__item")
             
-            try:
-                driver.get(url)
-                time.sleep(3)
-                
-                # Scroll otomatis agar produk muncul semua
-                for _ in range(2):
-                    driver.execute_script(f"window.scrollBy(0, {random.randint(600, 1000)});")
-                    time.sleep(2)
-                
-                items = driver.find_elements(By.CSS_SELECTOR, ".shopee-search-item-result__item")
-                
-                for item in items[:10]: 
-                    try:
-                        text_full = item.text
-                        lines = text_full.split('\n')
-                        
-                        price = 0
-                        sold = 0
-                        
-                        # Parsing data harga dan jumlah terjual
-                        for line in lines:
-                            if "Rp" in line and "Min" not in line:
-                                clean = line.replace("Rp", "").replace(".", "").strip()
-                                if clean.isdigit(): price = int(clean)
-                            
-                            if "Terjual" in line:
-                                val = line.replace("Terjual", "").replace("RB", "000").replace("+", "").replace(",", ".").strip()
-                                try: sold = float(val)
-                                except: sold = 0
+            for item in items[:8]: # Ambil 8 barang termurah per keyword
+                try:
+                    text = item.text
+                    
+                    # Parsing Harga
+                    price = 0
+                    lines = text.split('\n')
+                    for line in lines:
+                        if "Rp" in line and not "Min" in line: # Hindari 'Min. Belanja'
+                            clean = line.replace("Rp", "").replace(".", "").strip()
+                            if clean.isdigit():
+                                price = int(clean)
+                                break
+                    
+                    # Parsing Terjual
+                    sold = 0
+                    for line in lines:
+                        if "Terjual" in line:
+                            if "RB" in line:
+                                val = line.replace("RB", "").replace("+", "").replace(",", ".").replace("Terjual", "").strip()
+                                sold = float(val) * 1000
+                            else:
+                                val = line.replace("Terjual", "").strip()
+                                sold = int(val)
 
-                        # Logika filter Rp 0 dengan voucher pribadi
-                        price_final = price - estimasi_voucher
-                        if price_final < 0: price_final = 0
-                        
-                        note = ""
-                        is_match = False
+                    # LOGIKA UTAMA: APAKAH JADI Rp 0?
+                    final_price = price - discount_value
+                    if final_price < 0: final_price = 0
+                    
+                    is_candidate = False
+                    note = ""
 
-                        if 0 < price <= 2000:
-                            is_match = True
-                            note = "FLASH SALE 🔥"
-                            price_final = price 
-                        elif 2000 < price <= estimasi_voucher:
-                            is_match = True
-                            note = "GRATIS (Voucher) 🎫"
-                            price_final = 0
+                    # Kriteria 1: Diskon Voucher bikin jadi Rp 0
+                    if price <= discount_value and price > 0:
+                        is_candidate = True
+                        note = "GRATIS (Pakai Voucher)"
 
-                        # Filter minimal terjual 1000 item
-                        if is_match and sold >= 1000:
-                            link = item.find_element(By.TAG_NAME, "a").get_attribute("href")
-                            img = item.find_element(By.TAG_NAME, "img").get_attribute("src")
-                            title = item.find_element(By.TAG_NAME, "img").get_attribute("alt")
+                    # Kriteria 2: Memang Rp 1 - 1000 (Flash Sale)
+                    elif price <= 1000:
+                        is_candidate = True
+                        note = "FLASH SALE MURAH"
 
-                            print(f"   [+] {title[:25]}... | Rp {price}")
-                            
-                            results.append({
-                                "title": title,
-                                "price_original": price,
-                                "price_final": price_final,
-                                "sold": sold,
-                                "link": link,
-                                "image": img,
-                                "note": note
-                            })
-                    except: continue
-            except Exception as e:
-                print(f"   Gagal memuat halaman: {e}")
-                continue
+                    # Filter Terjual & Rating (Asumsi rating bagus jika terjual banyak)
+                    if is_candidate and sold >= 1000:
+                        img = item.find_element(By.TAG_NAME, "img").get_attribute("src")
+                        link = item.find_element(By.TAG_NAME, "a").get_attribute("href")
+                        title = item.find_element(By.TAG_NAME, "img").get_attribute("alt")
 
-        # Simpan dan Push ke GitHub secara otomatis
-        if results:
-            print(f"\n💾 Berhasil memanen {len(results)} barang.")
-            with open("data.json", "w") as f:
-                json.dump(results, f)
-            
-            print("☁️ Mengirim data terbaru ke GitHub...")
-            os.system("git add data.json")
-            os.system('git commit -m "Update barang murah otomatis"')
-            os.system("git push")
-            print("✅ DASHBOARD TERUPDATE!")
-        else:
-            print("❌ Tidak ada barang yang memenuhi kriteria kali ini.")
+                        results.append({
+                            "title": title,
+                            "price_original": price,
+                            "price_final": final_price,
+                            "sold": sold,
+                            "note": note,
+                            "image": img,
+                            "link": link,
+                            "timestamp": time.strftime("%H:%M")
+                        })
+                        print(f"   [DAPAT] {title} -> {note}")
+
+                except Exception:
+                    continue
+        
+        driver.quit()
+
+        # 3. Simpan & Upload ke GitHub
+        with open("data.json", "w") as f:
+            json.dump(results, f)
+        
+        print("☁️ Mengupload data ke GitHub Dashboard...")
+        os.system("git add data.json")
+        os.system('git commit -m "Update Otomatis Shopee"')
+        os.system("git push")
+        print("✅ Selesai! Cek website Anda.")
 
     except Exception as e:
-        print(f"❌ KONEKSI GAGAL: {e}")
-        print("Pastikan Chrome sudah dibuka via CMD dengan port 9222!")
+        print(f"❌ Error: {e}")
 
 if __name__ == "__main__":
     scrape_shopee()
