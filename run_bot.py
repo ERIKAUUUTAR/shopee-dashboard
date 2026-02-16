@@ -11,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 # ==================== KONFIGURASI ====================
 # Ganti USERNAME_WINDOWS dengan nama user laptop Anda
 # Contoh: C:\\Users\\Administrator\\AppData\\Local\\Google\\Chrome\\User Data
-user_data_dir = r"C:\Users\NAMA_USER_ANDA\AppData\Local\Google\Chrome\User Data" 
+user_data_dir = r"C:\Users\NAMA_USER_ANDA\AppData\Local\Google\Chrome\User Datai" 
 # =====================================================
 
 def setup_driver():
