@@ -3,118 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shopee Hunter Pribadi</title>
+    <title>Shopee Hunter - Dashboard DELL</title>
     <style>
-        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; padding: 20px; max-width: 600px; margin: 0 auto; }
-        
-        .header { 
-            text-align: center; margin-bottom: 25px; 
-            background: white; padding: 20px; border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        }
-        .header h2 { margin: 0 0 10px 0; color: #ee4d2d; }
-        .header p { margin: 0; color: #666; font-size: 0.9rem; }
-
-        .card { 
-            background: white; padding: 15px; border-radius: 12px; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 15px; 
-            display: flex; gap: 15px; align-items: start;
-            transition: transform 0.2s;
-        }
-        .card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(238, 77, 45, 0.15); }
-        
-        .card img { 
-            width: 90px; height: 90px; object-fit: cover; 
-            border-radius: 8px; border: 1px solid #eee; 
-        }
-        
-        .info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; min-height: 90px; }
-        
-        .badge { 
-            display: inline-block; background: #d4edda; color: #155724; 
-            font-size: 10px; padding: 3px 8px; border-radius: 20px; 
-            font-weight: bold; margin-bottom: 5px; width: fit-content;
-        }
-        .badge.flash { background: #ffeeba; color: #856404; } /* Warna beda kalau flash sale */
-
-        .title { 
-            font-size: 14px; margin-bottom: 5px; font-weight: 500; color: #333;
-            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-        }
-        
-        .prices { display: flex; gap: 8px; align-items: baseline; margin-top: auto; }
-        .final { color: #ee4d2d; font-weight: 800; font-size: 16px; }
-        .orig { text-decoration: line-through; color: #aaa; font-size: 11px; }
-        
-        .meta-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
-        .sold { font-size: 11px; color: #777; }
-        
-        .btn { 
-            background: #ee4d2d; color: white; text-decoration: none; 
-            padding: 6px 15px; border-radius: 20px; font-size: 12px; font-weight: bold;
-        }
-        .btn:hover { background: #d03419; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .header { background: white; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .header h2 { color: #ee4d2d; margin: 0; }
+        .card { background: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; display: flex; gap: 15px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .card img { width: 90px; height: 90px; object-fit: cover; border-radius: 8px; }
+        .info { flex: 1; }
+        .badge { background: #d4edda; color: #155724; font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: bold; }
+        .final-price { color: #ee4d2d; font-weight: bold; font-size: 18px; margin: 5px 0; }
+        .orig-price { text-decoration: line-through; color: #aaa; font-size: 12px; }
+        .btn { background: #ee4d2d; color: white; text-decoration: none; padding: 8px 15px; border-radius: 20px; font-size: 13px; font-weight: bold; display: inline-block; margin-top: 5px; }
     </style>
 </head>
 <body>
-
     <div class="header">
-        <h2>🔥 Shopee Hunter</h2>
-        <p id="status">Sedang membaca data...</p>
-        <p style="font-size: 10px; color: #999; margin-top:5px">Refresh halaman untuk update</p>
+        <h2>🔥 Shopee Hunter Dashboard</h2>
+        <p id="status">Memuat data terbaru...</p>
     </div>
-
     <div id="list"></div>
 
     <script>
-        // Fungsi agar angka jadi format Rupiah (Rp 10.000)
-        const formatRupiah = (angka) => {
-            return new Intl.NumberFormat('id-ID').format(angka);
-        };
+        const formatIDR = (n) => new Intl.NumberFormat('id-ID').format(n);
 
-        // Tambahkan timestamp agar data selalu fresh tidak nyangkut di cache
         fetch('data.json?v=' + new Date().getTime())
         .then(res => res.json())
         .then(data => {
             const list = document.getElementById('list');
-            const status = document.getElementById('status');
+            document.getElementById('status').innerText = `Ditemukan ${data.length} barang buruan`;
             
-            if (data.length === 0) {
-                status.innerText = "Tidak ada barang yang cocok saat ini.";
-                return;
-            }
-
-            status.innerText = `Ditemukan ${data.length} barang murah!`;
-            list.innerHTML = '';
-
             data.forEach(item => {
-                // Tentukan warna badge
-                let badgeClass = item.note.includes("FLASH") ? "badge flash" : "badge";
-
                 list.innerHTML += `
                 <div class="card">
-                    <img src="${item.image}" alt="img" onerror="this.src='https://placehold.co/80x80?text=No+Img'">
+                    <img src="${item.image}" alt="produk">
                     <div class="info">
-                        <span class="${badgeClass}">${item.note}</span>
-                        <div class="title">${item.title}</div>
-                        
+                        <span class="badge">${item.note}</span>
+                        <div style="font-size: 14px; font-weight: 500; margin: 5px 0;">${item.title}</div>
                         <div class="prices">
-                            <span class="final">Rp ${formatRupiah(item.price_final)}</span>
-                            ${item.price_original > item.price_final ? `<span class="orig">Rp ${formatRupiah(item.price_original)}</span>` : ''}
+                            <span class="final-price">Rp ${formatIDR(item.price_final)}</span>
+                            <span class="orig-price">Rp ${formatIDR(item.price_original)}</span>
                         </div>
-
-                        <div class="meta-row">
-                            <div class="sold">Terjual: ${formatRupiah(item.sold)}+</div>
-                            <a href="${item.link}" target="_blank" class="btn">Ambil</a>
-                        </div>
+                        <div style="font-size: 11px; color: #777;">Terjual: ${formatIDR(item.sold)}+</div>
+                        <a href="${item.link}" target="_blank" class="btn">Beli Sekarang</a>
                     </div>
                 </div>`;
             });
         })
-        .catch(e => {
-            document.getElementById('status').innerHTML = 
-            "<span style='color:red'>Gagal baca data.<br>Pastikan Anda sudah upload file <b>data.json</b> ke GitHub!</span>";
-        });
+        .catch(() => document.getElementById('status').innerText = "Gagal memuat data.json");
     </script>
 </body>
 </html>
